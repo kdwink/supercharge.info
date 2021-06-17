@@ -4,7 +4,13 @@ import TotalOpen from "./TotalOpen";
 import SiteIterator from "../../site/SiteIterator";
 import Highcharts from "highcharts";
 
-export default class TotalOpenWorldLineChart {
+export default class TotalOpenLocationLineChart {
+
+    constructor(type, location, locationId) {
+        this.type = type || 'World';
+        this.location = location || 'World Wide';
+        this.locationId = locationId;
+    }
 
     draw() {
 
@@ -17,10 +23,15 @@ export default class TotalOpenWorldLineChart {
             }
         }
 
-        new SiteIterator()
+        let iter = new SiteIterator()
             .withPredicate(SitePredicates.IS_OPEN)
-            .withPredicate(SitePredicates.IS_COUNTED)
-            .withSort(SiteSorting.BY_OPENED_DATE)
+            .withPredicate(SitePredicates.IS_COUNTED);
+        if (this.type == 'Region') {
+            iter.withPredicate(SitePredicates.buildRegionPredicate(this.locationId));
+        } else if (this.type == 'Country') {
+            iter.withPredicate(SitePredicates.buildCountryPredicate(this.locationId));
+        }
+        iter.withSort(SiteSorting.BY_OPENED_DATE)
             .iterate((supercharger) => {
                 const date = supercharger.dateOpened;
                 const dateUTC = Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
@@ -29,10 +40,17 @@ export default class TotalOpenWorldLineChart {
                 livePerDate.push([dateUTC, count]);
             });
 
+        // Extend chart from 0 to today
+        const today = Number(new Date(new Date().toISOString().split('T')[0]));
+        if(livePerDate[livePerDate.length - 1][0] < today) {
+            livePerDate.push([today, livePerDate[livePerDate.length - 1][1]]);
+        }
+        livePerDate.unshift([livePerDate[0][0] - Math.max((livePerDate[1][0] - livePerDate[0][0]) / 30, 24 * 60 * 60 * 1000), 0]);
         const plotLinesArray = TotalOpen.buildVerticalYearPlotLines();
+        const location = this.location;
 
 
-        Highcharts.chart("total-open-world-line-chart", {
+        Highcharts.chart("total-open-location-line-chart", {
             chart: {
                 zoomType: 'x',
                 type: 'spline'
@@ -41,7 +59,7 @@ export default class TotalOpenWorldLineChart {
                 enabled: false
             },
             title: {
-                text: 'Open Superchargers'
+                text: `Open Superchargers: ${this.location}`
             },
             subtitle: {
                 text: null
@@ -65,7 +83,7 @@ export default class TotalOpenWorldLineChart {
             },
             tooltip: {
                 formatter: function () {
-                    return '<b>World Wide</b><br/>' +
+                    return `<b>${location}</b><br/>` +
                         Highcharts.dateFormat('%b %e %Y', this.x) + '<br/>' +
                         "superchargers: " + this.y;
                 }
@@ -77,7 +95,7 @@ export default class TotalOpenWorldLineChart {
                     color: '#B22222',
                     lineWidth: 1,
                     marker: {
-                        enabled: true,
+                        enabled: livePerDate[livePerDate.length - 1][1] < 100,
                         radius: 3,
                         fillColor: '#B22222'
                     }

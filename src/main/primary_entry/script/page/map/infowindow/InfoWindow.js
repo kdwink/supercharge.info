@@ -22,6 +22,7 @@ export default class InfoWindow {
         // state fields
         this.popup = null;
         this.showDetails = true;
+        this.showHistory = false;
         this.showNearby = false;
         this.pinned = false;
     }
@@ -60,6 +61,18 @@ export default class InfoWindow {
 
         if (this.showDetails) {
             Analytics.sendEvent("map", "view-marker-details");
+        }
+    };
+
+    toggleHistory(showHistory) {
+        if (!Objects.isNullOrUndef(showHistory)) {
+            this.showHistory = showHistory;
+        } else {
+            this.showHistory = !this.showHistory;
+        }
+
+        if (this.showHistory) {
+            Analytics.sendEvent("map", "view-marker-history");
         }
     };
 
@@ -155,11 +168,15 @@ export default class InfoWindow {
             popupContent += buildDetailsDiv(site, rangeModel.getDisplayUnit());
         }
 
+        if (this.showHistory) {
+            popupContent += _buildHistoryDiv(site);
+        }
+
         if (this.showNearby) {
             popupContent += _buildNearbyDiv(site);
         }
 
-        popupContent += _buildLinksDiv(site, this.showDetails);
+        popupContent += _buildLinksDiv(site, this);
 
         popupContent += "</div>";
         return popupContent;
@@ -167,6 +184,23 @@ export default class InfoWindow {
 
 };
 
+
+/**
+ * This is the content in the InfoWindow that shows up when the user clicks 'details'.
+ */
+function _buildHistoryDiv(supercharger) {
+    let div = "";
+    div += `<div class='info-window-details' id='nearby-details-${supercharger.id}'>`;
+    div += "<table style='width:100%;'>";
+
+    div += "<tr style='font-weight:bold;'><td>Date</td><td>Status</td></tr>";
+
+    div += supercharger.history.map(a => `<tr><td>${a.date}</td><td class='${a.siteStatus.toLowerCase().replace('_','-')}'>${a.siteStatus}</td></tr>`).join('');
+
+    div += "</table>";
+    div += "</div>";
+    return div;
+}
 
 /**
  * This is the content in the InfoWindow that shows up when the user clicks 'details'.
@@ -187,7 +221,7 @@ function _buildNearbyDiv(supercharger) {
     return div;
 }
 
-function _buildLinksDiv(supercharger, showDetails) {
+function _buildLinksDiv(supercharger, info) {
     let content = "<div class='links-container'>";
 
     const linkList = [
@@ -196,7 +230,8 @@ function _buildLinksDiv(supercharger, showDetails) {
         buildLinkZoom(supercharger),
         buildLinkCircleToggle(supercharger),
         buildLinkAddToRoute(supercharger),
-        buildLinkDetails(supercharger, showDetails),
+        buildLinkDetails(supercharger, info),
+        buildLinkHistory(supercharger, info),
         buildLinkNearby(supercharger),
 
         // links that are NOT always present.
@@ -271,8 +306,12 @@ function buildLinkRemoveAllMarkers(supercharger) {
     return null;
 }
 
-function buildLinkDetails(supercharger, showDetails) {
-    return `<a class='details-trigger' href='#${supercharger.id}'>${showDetails ? "hide" : "show"} details</a>`;
+function buildLinkDetails(supercharger, info) {
+    return `<a class='details-trigger' href='#${supercharger.id}'>${info.showDetails ? "hide" : "show"} details</a>`;
+}
+
+function buildLinkHistory(supercharger, info) {
+    return `<a class='history-trigger' href='#${supercharger.id}'>${info.showHistory ? "hide" : "show"} history</a>`;
 }
 
 function buildPinMarker(supercharger, isPinned) {
